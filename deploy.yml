@@ -1,34 +1,59 @@
 name: CI/CD Pipeline for AWS
+aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+aws-region: us-east-1
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  MyDynamoDBTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: 'MyTable'
+      AttributeDefinitions:
+        - AttributeName: 'id'
+          AttributeType: 'S'
+      KeySchema:
+        - AttributeName: 'id'
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  MyLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: 'MyFunction'
+      Handler: 'index.handler'
+      Role: !GetAtt MyLambdaExecutionRole.Arn
+      Code:
+        S3Bucket: 'my-bucket'
+        S3Key: 'lambda-code.zip'
+      Runtime: 'nodejs14.x'
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref MyDynamoDBTable
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+  MyLambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'lambda-dynamodb-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'dynamodb:*'
+                Resource: !GetAtt MyDynamoDBTable.Arn
 
-      - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Deploy Lambda function
-        run: |
-          aws cloudformation deploy \
-            --template-file template.yaml \
-            --stack-name my-stack \
-            --capabilities CAPABILITY_IAM
-
-      - name: Post-deployment
-        run: echo "Deployment complete!"
+  MyApiGateway:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: 'MyApi'
