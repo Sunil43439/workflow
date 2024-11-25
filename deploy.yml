@@ -1,59 +1,23 @@
-name: CI/CD Pipeline for AWS
-aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-aws-region: us-east-1
-
-AWSTemplateFormatVersion: '2010-09-09'
 Resources:
-  MyDynamoDBTable:
-    Type: 'AWS::DynamoDB::Table'
+  RegularUser:
+    Type: AWS::IAM::User
+  ExpressUser:
+    Type: AWS::IAM::User
+  ExpressPolicy:
+    Type: AWS::IAM::Policy
     Properties:
-      TableName: 'MyTable'
-      AttributeDefinitions:
-        - AttributeName: 'id'
-          AttributeType: 'S'
-      KeySchema:
-        - AttributeName: 'id'
-          KeyType: 'HASH'
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
-
-  MyLambdaFunction:
-    Type: 'AWS::Lambda::Function'
-    Properties:
-      FunctionName: 'MyFunction'
-      Handler: 'index.handler'
-      Role: !GetAtt MyLambdaExecutionRole.Arn
-      Code:
-        S3Bucket: 'my-bucket'
-        S3Key: 'lambda-code.zip'
-      Runtime: 'nodejs14.x'
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref MyDynamoDBTable
-
-  MyLambdaExecutionRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+      PolicyName: AllowExpressOperations
+      PolicyDocument:
         Statement:
-          - Effect: 'Allow'
-            Principal:
-              Service: 'lambda.amazonaws.com'
-            Action: 'sts:AssumeRole'
-      Policies:
-        - PolicyName: 'lambda-dynamodb-policy'
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: 'Allow'
-                Action:
-                  - 'dynamodb:*'
-                Resource: !GetAtt MyDynamoDBTable.Arn
-
-  MyApiGateway:
-    Type: 'AWS::ApiGateway::RestApi'
-    Properties:
-      Name: 'MyApi'
+          - Effect: Allow
+            Action:
+              - "s3express:CreateBucket"
+              - "s3express:CreateSession"
+            Resource: "*"
+      Users:
+        - !Ref ExpressUser
+Outputs:
+  RegularUser:
+    Value: !Ref RegularUser
+  ExpressUser:
+    Value: !Ref ExpressUser
